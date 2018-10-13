@@ -1,4 +1,4 @@
-stationcode="""                                                                                                                                                                                         
+stationcode="""                                                                                                                                                                      
 ALLP    Alappuzha
 AWY     Aluva
 CLT     Calicut
@@ -216,13 +216,84 @@ def live(bot, update, args):
                     )
             update.message.reply_text(msg)
 
+def arrivals(bot, update, args):
+    """Gives list of trains arriving at a station within a window period,
+        along with their live status.
+    Required args are the train number and the date
+    """
+    http = urllib3.PoolManager()
+    try:
+        station_code, hrs = args
+    except ValueError as exc:
+        update.message.reply_text(
+            'only need station code and hours window'
+            'eg: /arrivals sbc 2'
+            'eg: /arrivals awy 4'
+            )
+    else:
+        # for now we won't implement a date validator
+        LIVE = (
+            'https://api.railwayapi.com/v2/arrivals'
+            '/station/{station}'
+            '/hours/{hours}'
+            '/apikey/{key}'
+            ).format(
+                station=station_code,
+                hours=hrs,
+                key=key
+                )
+        r = http.request('GET', LIVE)
+        data = json.loads(r.data.decode('utf-8'))
+        if data['response_code'] != 200:
+            alert = "something went wrong"
+            update.message.reply_text(alert)
+        else:
+            arriving_trains = data['trains']
+            total_trains = data['total']
+            if arriving_trains:
+                msg = "Total {} trains arriving during {}".format(total_trains,hrs)
+                update.message.reply_text(msg)
+                for arr_train in arriving_trains:
+                    train_name = arr_train["name"]
+                    train_number = arr_train["number"]
+                    
+                    sch_arr = arr_train["scharr"]
+                    act_arr = arr_train["actarr"]
+                    delay_arr = arr_train["delayarr"]
+                     
+                    sched_dep = arr_train["schdep"]
+                    act_dep = arr_train["actdep"]
+                    delay_dep = arr_train["delaydep"]
+                    
+                    msg = (
+                        'Train: {name}\n'
+                        'Train Number: {number}\n'
+                        'Scheduled Arrival: {scharr}\n'
+                        'Actual Arrival: {actarr}\n'
+                        'Delay in Arrival: {delayarr}\n'
+                        'Scheduled Departure: {schdep}\n'
+                        'Actual Departure: {actdep}\n'
+                        'Delay in Departure: {delaydep}'
+                        ).format(
+                            name = train_name,
+                            number = train_number,
+                            scharr = sch_arr,
+                            actarr = act_arr,
+                            delayarr = delay_arr,
+                            schdep = sched_dep,
+                            actdep = act_dep,
+                            delaydep = delay_dep
+                            )
+                    update.message.reply_text(msg)
+            else:
+                alert = "No arriving trains during {} hours".format(hrs)
+                update.message.reply_text(alert)
+
 
 def help(bot, update):
 
 
     help = """
-      what this bot can do ..?
-      this bot helps to get services offered by  NTES
       available commands and their usage 
       for listings trains between stations use 
       /trains <start> <destination>
@@ -233,8 +304,13 @@ def help(bot, update):
       for listing trains on particular date
       /date <start> <dest> <dd> <mm> <yyyy>
       eg: /date awy sbc 15 08 2018
-      for gettting the status of your PNR
+      for getting the status of your PNR
       /pnr <pnr no>
+      for getting live train status
+      /live train# 15-08-2018
+      for list trains arriving in a station in comming hrs
+      /arrivals sbc 4
+      /arrivals awy 2
 """
 
     update.message.reply_text(help)
@@ -249,6 +325,7 @@ def main():
     dp.add_handler(CommandHandler("code",code))
     dp.add_handler(CommandHandler("pnr",pnr,pass_args=True))
     dp.add_handler(CommandHandler("live", live, pass_args=True))
+    dp.add_handler(CommandHandler("arrivals", arrivals, pass_args=True))
     updater.start_polling()
     updater.idle()
 if __name__ == '__main__':

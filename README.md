@@ -8,5 +8,3 @@ Now 24/7 online thanks to Heroku
 
 ## How to contribute
 Star -> Fork -> Make it awesome -> PR !
-
-
